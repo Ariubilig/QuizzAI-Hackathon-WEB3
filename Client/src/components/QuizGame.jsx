@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import SelectCategory from './SelectCategory';
+import StartScreen from './StartScreen';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 const QuizGame = () => {
     const [loading, setLoading] = useState(false);
@@ -12,10 +15,22 @@ const QuizGame = () => {
     const timerRef = useRef(null);
 
     const [endTime, setEndTime] = useState(null);
+    const [quizHistory, setQuizHistory] = useState([]);
+
+    const [selectedCategory, setSelectedCategory] = useState('Mixed');
+    const [view, setView] = useState('home'); // home, category, playing, result
+    
+    const categories = ['Mixed', 'Science', 'History', 'Geography', 'Technology', 'Space', 'Pop Culture', 'Mathematics'];
 
     // Load state from localStorage on mount
     useEffect(() => {
         const savedState = localStorage.getItem('quizState');
+        const savedHistory = localStorage.getItem('quizHistory');
+        
+        if (savedHistory) {
+            setQuizHistory(JSON.parse(savedHistory));
+        }
+
         if (savedState) {
             const parsed = JSON.parse(savedState);
             
@@ -35,14 +50,23 @@ const QuizGame = () => {
             setTimeLeft(remainingTime);
             setEndTime(parsed.endTime);
             setGameOver(parsed.gameOver);
+            
+            if (parsed.selectedCategory) {
+                setSelectedCategory(parsed.selectedCategory);
+            }
 
-            // If game was active and time remains, restart timer
-            if (!parsed.gameOver && parsed.quizData && remainingTime > 0) {
-                startTimer();
-            } else if (!parsed.gameOver && parsed.quizData && remainingTime <= 0) {
-                // Time expired while away
-                setGameOver(true);
-                setTimeLeft(0);
+            // Restore view state if possible, otherwise infer
+            if (parsed.quizData && !parsed.gameOver) {
+                setView('playing');
+                if (remainingTime > 0) {
+                    startTimer();
+                } else {
+                    setGameOver(true);
+                    setTimeLeft(0);
+                    setView('result');
+                }
+            } else if (parsed.gameOver) {
+                setView('result');
             }
         }
     }, []);
@@ -57,10 +81,11 @@ const QuizGame = () => {
                 score,
                 timeLeft,
                 endTime,
-                gameOver
+                gameOver,
+                selectedCategory
             }));
         }
-    }, [quizData, currentQuestionIndex, selectedAnswers, score, timeLeft, endTime, gameOver]);
+    }, [quizData, currentQuestionIndex, selectedAnswers, score, timeLeft, endTime, gameOver, selectedCategory]);
 
     const fetchQuiz = async () => {
         setLoading(true);
@@ -78,12 +103,22 @@ const QuizGame = () => {
         try {
             const response = await fetch('http://localhost:3000/api/quiz', {
                 method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ category: selectedCategory }),
             });
             if (!response.ok) {
                 throw new Error('Failed to fetch quiz');
             }
             const data = await response.json();
+            
+            if (!data || !data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+                throw new Error('Invalid quiz data received from server');
+            }
+            
             setQuizData(data);
+            setView('playing');
             
             // Set end time 45 seconds from now
             const calculatedEndTime = Date.now() + 45000;
@@ -91,7 +126,8 @@ const QuizGame = () => {
             
             startTimer();
         } catch (err) {
-            setError(err.message);
+            console.error("Fetch error:", err);
+            setError(err.message || 'Failed to load quiz');
             setLoading(false);
         } finally {
             setLoading(false);
@@ -114,7 +150,7 @@ const QuizGame = () => {
     const endGame = () => {
         clearInterval(timerRef.current);
         setGameOver(true);
-        // calculateScore is called via useEffect when gameOver changes
+        setView('result');
     };
 
     const calculateScore = () => {
@@ -126,6 +162,23 @@ const QuizGame = () => {
             }
         });
         setScore(newScore);
+        
+        const newHistoryItem = {
+            id: quizData.quiz_id || Date.now(),
+            date: new Date().toLocaleString(),
+            score: newScore,
+            total: quizData.questions.length,
+            category: selectedCategory
+        };
+
+        setQuizHistory(prev => {
+            if (prev.length > 0 && prev[0].id === newHistoryItem.id) {
+                return prev;
+            }
+            const newHistory = [newHistoryItem, ...prev].slice(0, 10);
+            localStorage.setItem('quizHistory', JSON.stringify(newHistory));
+            return newHistory;
+        });
     };
 
     const handleAnswerSelect = (questionId, option) => {
@@ -144,13 +197,29 @@ const QuizGame = () => {
         }
     };
 
+    const handleHome = () => {
+        setQuizData(null);
+        setGameOver(false);
+        setScore(0);
+        setCurrentQuestionIndex(0);
+        setSelectedAnswers({});
+        setTimeLeft(45);
+        setEndTime(null);
+        localStorage.removeItem('quizState');
+        setView('home');
+    };
+
+    const handlePlayAgain = () => {
+        // Go to category selection instead of immediate restart
+        setView('category');
+    };
+
     useEffect(() => {
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
     }, []);
 
-    // Recalculate score whenever game ends to ensure latest state is used
     useEffect(() => {
         if (gameOver) {
             calculateScore();
@@ -158,99 +227,147 @@ const QuizGame = () => {
     }, [gameOver]);
 
 
+    // Wallet button component for top right
+    const WalletButton = () => (
+        <div className="wallet-button-container">
+            <ConnectButton chainStatus="icon" showBalance={false} />
+        </div>
+    );
+
     if (loading) {
-        return <div className="loading-container">Generating Quiz...</div>;
+        return (
+            <>
+                <WalletButton />
+                <div className="loading-container">Generating {selectedCategory} Quiz...</div>
+            </>
+        );
     }
 
     if (error) {
         return (
-            <div className="error-container">
-                <p>Error: {error}</p>
-                <button onClick={fetchQuiz} className="btn-primary">Try Again</button>
-            </div>
-        );
-    }
-
-    if (!quizData && !gameOver) {
-        return (
-            <div className="start-screen">
-                <h1>Infinite Quiz AI</h1>
-                <p>10 Questions. 45 Seconds. Prove your knowledge.</p>
-                <button onClick={fetchQuiz} className="btn-primary">Take Quiz</button>
-            </div>
-        );
-    }
-
-    if (gameOver) {
-        return (
-            <div className="results-screen">
-                <h2>Game Over</h2>
-                <div className="score-display">
-                    <span className="score-value">{score}</span>
-                    <span className="score-total">/ {quizData?.questions?.length || 10}</span>
+            <>
+                <WalletButton />
+                <div className="error-container">
+                    <p>Error: {error}</p>
+                    <button onClick={() => setView('home')} className="btn-primary">Go Home</button>
                 </div>
-                <p>Time Remaining: {timeLeft}s</p>
-                <button onClick={fetchQuiz} className="btn-primary">Play Again</button>
-                
-                <div className="answers-review">
-                    <h3>Review</h3>
-                    {quizData?.questions.map((q, index) => (
-                        <div key={q.id} className={`review-item ${selectedAnswers[q.id] === q.correct_answer ? 'correct' : 'incorrect'}`}>
-                            <p><strong>Q{index + 1}:</strong> {q.question}</p>
-                            <p>Your Answer: {selectedAnswers[q.id] || 'Skipped'}</p>
-                            <p>Correct Answer: {q.correct_answer}</p>
-                            <p className="explanation">{q.explanation}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
+            </>
         );
     }
 
-    const currentQuestion = quizData.questions[currentQuestionIndex];
+    // View Routing
+    if (view === 'home') {
+        return (
+            <>
+                <WalletButton />
+                <StartScreen 
+                    onStart={() => setView('category')} 
+                    history={quizHistory} 
+                />
+            </>
+        );
+    }
+
+    if (view === 'category') {
+        return (
+            <>
+                <WalletButton />
+                <SelectCategory 
+                    categories={categories}
+                    selectedCategory={selectedCategory}
+                    onSelectCategory={setSelectedCategory}
+                    onStart={fetchQuiz}
+                    onBack={() => setView('home')}
+                />
+            </>
+        );
+    }
+
+    if (view === 'result') {
+        return (
+            <>
+                <WalletButton />
+                <div className="results-screen">
+                    <h2>Game Over</h2>
+                    <div className="score-display">
+                        <span className="score-value">{score}</span>
+                        <span className="score-total">/ {quizData?.questions?.length || 10}</span>
+                    </div>
+                    <p>Time Remaining: {timeLeft}s</p>
+                    <div className="action-buttons">
+                        <button onClick={handlePlayAgain} className="btn-primary">Play Again</button>
+                        <button onClick={handleHome} className="btn-secondary">Home</button>
+                    </div>
+                    
+                    <div className="answers-review">
+                        <h3>Review</h3>
+                        {quizData?.questions.map((q, index) => (
+                            <div key={q.id} className={`review-item ${selectedAnswers[q.id] === q.correct_answer ? 'correct' : 'incorrect'}`}>
+                                <p><strong>Q{index + 1}:</strong> {q.question}</p>
+                                <p>Your Answer: {selectedAnswers[q.id] || 'Skipped'}</p>
+                                <p>Correct Answer: {q.correct_answer}</p>
+                                <p className="explanation">{q.explanation}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </>
+        );
+    }
+
+    // Playing View
+    const currentQuestion = quizData?.questions?.[currentQuestionIndex];
+
+    if (!currentQuestion) {
+        return <div className="error-container">Error: Question not found</div>;
+    }
 
     return (
-        <div className="game-container">
-            <div className="game-header">
-                <div className="timer" style={{ color: timeLeft < 10 ? 'red' : 'inherit' }}>
-                    Time: {timeLeft}s
+        <>
+            <WalletButton />
+            <div className="game-container">
+                <div className="game-header">
+                    <div className="timer" style={{ color: timeLeft < 10 ? 'red' : 'inherit' }}>
+                        Time: {timeLeft}s
+                    </div>
+                    <div className="progress">
+                        Question {currentQuestionIndex + 1} / {quizData.questions.length}
+                    </div>
                 </div>
-                <div className="progress">
-                    Question {currentQuestionIndex + 1} / {quizData.questions.length}
-                </div>
-            </div>
 
-            <div className="question-card">
-                <div className="category-badge">{currentQuestion.category} - {currentQuestion.difficulty}</div>
-                <h2 className="question-text">{currentQuestion.question}</h2>
-                
-                <div className="options-grid">
-                    {currentQuestion.options.map((opt, idx) => {
-                        const letter = ['A', 'B', 'C', 'D'][idx];
-                        const isSelected = selectedAnswers[currentQuestion.id] === letter;
-                        return (
-                            <button 
-                                key={letter} 
-                                className={`option-btn ${isSelected ? 'selected' : ''}`}
-                                onClick={() => handleAnswerSelect(currentQuestion.id, letter)}
-                            >
-                                <span className="option-letter">{letter}</span>
-                                <span className="option-text">{opt}</span>
-                            </button>
-                        );
-                    })}
+                <div className="question-card">
+                    <div className="category-badge">{currentQuestion.category} - {currentQuestion.difficulty}</div>
+                    <h2 className="question-text">{currentQuestion.question}</h2>
+                    
+                    <div className="options-grid">
+                        {currentQuestion.options.map((opt, idx) => {
+                            const letter = ['A', 'B', 'C', 'D'][idx];
+                            const isSelected = selectedAnswers[currentQuestion.id] === letter;
+                            return (
+                                <button 
+                                    key={letter} 
+                                    className={`option-btn ${isSelected ? 'selected' : ''}`}
+                                    onClick={() => handleAnswerSelect(currentQuestion.id, letter)}
+                                >
+                                    <span className="option-letter">{letter}</span>
+                                    <span className="option-text">{opt}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="game-footer">
+                    <button 
+                        className="btn-next" 
+                        onClick={handleNext}
+                        disabled={!selectedAnswers[currentQuestion.id]}
+                    >
+                        {currentQuestionIndex === quizData.questions.length - 1 ? 'Finish' : 'Next'}
+                    </button>
                 </div>
             </div>
-
-            <div className="game-footer">
-                <button 
-                    className="btn-next" 
-                    onClick={handleNext}
-                >
-                    {currentQuestionIndex === quizData.questions.length - 1 ? 'Finish' : 'Next'}
-                </button>
-            </div>
-        </div>
+        </>
     );
 };
 
