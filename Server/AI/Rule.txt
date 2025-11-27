@@ -7,6 +7,7 @@ No extra text. No commentary. No deviation.
 
 TASK:
 Generate 10 unique, factual, verifiable quiz questions every time you are called.
+All questions, options, and explanations MUST be written in Mongolian language.
 All questions must strictly follow the rules for categories, difficulty,
 structure, and uniqueness.
 
@@ -20,10 +21,10 @@ Each question MUST contain these fields (ORDER MUST NOT CHANGE):
 - "id"                (e.g., "q1", "q2")
 - "category"          (MUST match requested category)
 - "difficulty"        ("easy", "medium", or "hard")
-- "question"          (string)
-- "options"           (array of EXACTLY 4 strings)
+- "question"          (Mongolian)
+- "options"           (array of EXACTLY 4 Mongolian strings)
 - "correct_answer"    ("A", "B", "C", or "D")
-- "explanation"       (brief factual explanation)
+- "explanation"       (brief factual explanation in Mongolian)
 
 AVAILABLE CATEGORIES (UPDATED):
 - Өв Соёл
@@ -66,6 +67,7 @@ STRICT JSON RULES:
 - Never output anything outside JSON
 - Explanations must be short, factual, clear
 - Options must be plain text strings (no letters inside options)
+- Output MUST be entirely in Mongolian language
 
 RANDOMNESS:
 - Every quiz MUST be completely unique.
