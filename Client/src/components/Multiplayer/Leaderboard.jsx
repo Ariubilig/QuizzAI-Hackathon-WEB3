@@ -39,66 +39,77 @@ export default function Leaderboard() {
   }
 
   async function handleRematch() {
-      // Reset room status to waiting
+      // Reset all players' stats for rematch
+      await supabase
+        .from("players")
+        .update({ 
+          score: 0, 
+          time_taken: null, 
+          status: "joined" 
+        })
+        .eq("room_code", roomCode);
+        
+      // Reset room status to waiting and clear game_start_time
       await supabase
         .from("rooms")
-        .update({ status: "waiting", questions: null })
+        .update({ 
+          status: "waiting", 
+          questions: null,
+          game_start_time: null  // Clear the old start time
+        })
         .eq("code", roomCode);
         
-      // Reset players status? Or create new room?
-      // Simpler to create new room or just navigate back to lobby.
-      // If we navigate to lobby, we need to make sure lobby handles the reset.
-      // Let's just navigate to lobby for now.
+      // Navigate back to lobby
       navigate(`/lobby/${roomCode}`);
   }
 
-  if (loading) return <div className="text-white text-center mt-20">Loading results...</div>;
+  if (loading) return <div className="loading-text">Loading results...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8 flex flex-col items-center">
-      <h2 className="text-4xl font-bold mb-8 text-yellow-500 tracking-wider uppercase">Match Results</h2>
+    <div className="leaderboard-container">
+      <h2 className="leaderboard-title">Match Results</h2>
       
-      <div className="w-full max-w-4xl bg-gray-800 rounded-lg overflow-hidden shadow-2xl border border-gray-700">
-        <div className="grid grid-cols-12 bg-gray-900 p-4 text-gray-400 font-bold text-sm uppercase tracking-wider">
-            <div className="col-span-1 text-center">#</div>
-            <div className="col-span-5">Player</div>
-            <div className="col-span-2 text-center">Status</div>
-            <div className="col-span-2 text-center">Score</div>
-            <div className="col-span-2 text-center">Time</div>
+      <div className="leaderboard-table">
+        <div className="leaderboard-header">
+            <div className="col-rank">#</div>
+            <div className="col-player">Player</div>
+            <div className="col-status">Status</div>
+            <div className="col-score">Score</div>
+            <div className="col-time">Time</div>
         </div>
         
         {board.map((p, i) => (
-            <div key={i} className={`grid grid-cols-12 p-4 border-b border-gray-700 items-center hover:bg-gray-750 transition-colors ${i === 0 ? 'bg-yellow-900/20' : ''}`}>
-                <div className="col-span-1 text-center font-mono text-gray-500">{i + 1}</div>
-                <div className="col-span-5 font-semibold text-lg flex items-center gap-3">
-                    {i === 0 && <span className="text-yellow-400">👑</span>}
+            <div key={i} className={`leaderboard-row ${i === 0 ? 'first-place' : ''}`}>
+                <div className="col-rank">{i + 1}</div>
+                <div className="col-player">
+                    {i === 0 && <span className="host-badge">#1</span>}
                     {p.name}
                 </div>
-                <div className="col-span-2 text-center">
-                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                        p.status === 'finished' ? 'bg-green-900 text-green-400' : 'bg-blue-900 text-blue-400'
+                <div className="col-status">
+                    <span className={`status-badge ${
+                        p.status === 'finished' ? 'status-finished' : 'status-playing'
                     }`}>
                         {p.status === 'finished' ? 'Finished' : 'Playing'}
                     </span>
                 </div>
-                <div className="col-span-2 text-center font-mono text-xl text-blue-400">{p.score}</div>
-                <div className="col-span-2 text-center font-mono text-gray-400">
+                <div className="col-score">{p.score}</div>
+                <div className="col-time">
                     {p.time_taken ? `${(p.time_taken / 1000).toFixed(1)}s` : '-'}
                 </div>
             </div>
         ))}
       </div>
 
-      <div className="mt-8 flex gap-4">
+      <div className="leaderboard-actions">
         <button 
             onClick={() => navigate('/')}
-            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded font-semibold transition-colors"
+            className="btn-main-menu"
         >
             Main Menu
         </button>
         <button 
             onClick={handleRematch}
-            className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-black rounded font-semibold transition-colors"
+            className="btn-rematch"
         >
             Rematch
         </button>

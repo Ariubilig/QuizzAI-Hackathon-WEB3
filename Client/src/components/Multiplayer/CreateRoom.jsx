@@ -27,13 +27,22 @@ export default function CreateRoom() {
       return;
     }
 
-    // Also add host as a player? Or just host?
-    // Let's add host as a player for simplicity so they show up in lobby
-    const { data: playerData, error: playerError } = await supabase
+    // Get username from QuizGame profile or generate random
+    const storedProfile = localStorage.getItem("userProfile");
+    let username = "Player";
+    if (storedProfile) {
+      const profile = JSON.parse(storedProfile);
+      username = profile.username || "Host";
+    } else {
+      // Generate random username
+      username = `Player${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+    
+    const { data: playerData, error: playerError} = await supabase
       .from("players")
       .insert({
         room_code: code,
-        name: "Host", // Could prompt for name
+        name: username,
         status: "joined"
       })
       .select()
@@ -50,15 +59,23 @@ export default function CreateRoom() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 p-6 bg-gray-800 rounded-lg shadow-xl">
-      <h2 className="text-2xl font-bold text-white">Create a Room</h2>
+    <div className="create-room-card">
+      <h2 className="create-room-title">Create a Room</h2>
       <button 
         onClick={createRoom}
-        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold transition-all transform hover:scale-105"
+        className="btn-create-action"
       >
         Create New Room
       </button>
-      {roomCode && <p className="text-gray-300">Your room code: <span className="font-mono font-bold text-yellow-400">{roomCode}</span></p>}
+      {roomCode && <p className="room-code-text">Your room code: <span className="room-code-highlight">{roomCode}</span></p>}
+      
+      <button 
+        onClick={() => navigate('/multiplayer')}
+        className="btn-back-menu"
+        style={{ marginTop: '1rem' }}
+      >
+        ← Back
+      </button>
     </div>
   );
 }

@@ -7,12 +7,12 @@ const StartScreen = ({ onStart, onProfile, history, balance, username }) => {
     return (
         <div className="start-screen">
             <div className="profile-btn-container" onClick={onProfile}>
-                <span>👤 {username}</span>
+                <span>{username}</span>
                 <span className="balance-badge">{balance} 🪙</span>
             </div>
 
             <div className="start-screen-main">
-                <h1>Infinite Quiz AI</h1>
+                <h1>DanDar Quizz</h1>
                 <p>10 Questions. 45 Seconds. Prove your knowledge.</p>
 
                 <div className="start-actions flex gap-4">

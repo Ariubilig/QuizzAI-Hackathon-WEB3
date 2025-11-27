@@ -1,27 +1,52 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../../supabaseClient";
 import { useParams, useNavigate } from "react-router-dom";
+import "../../App.css"; 
 
 export default function MultiplayerGame() {
   const { roomCode } = useParams();
   const navigate = useNavigate();
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [startTime, setStartTime] = useState(null);
+  const [selectedAnswers, setSelectedAnswers] = useState({}); // Map of questionId -> answer
+  const [timeLeft, setTimeLeft] = useState(45);
+  const [endTime, setEndTime] = useState(null); // New: for robust timer
   const [loading, setLoading] = useState(true);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [playerFinished, setPlayerFinished] = useState(false); // Track if player completed all questions
+  const timerRef = useRef(null);
 
+  // Load state from localStorage on mount or roomCode change
   useEffect(() => {
-    if (roomCode) {
-      loadGame();
-    }
+    if (!roomCode) return;
+
+    // For multiplayer, always load fresh from database
+    // Don't restore from localStorage as it may be stale
+    console.log('MultiplayerGame: Loading fresh game state');
+    loadGame();
+
+    return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [roomCode]);
+
+  // Don't save multiplayer game state to localStorage
+  // We always load fresh from database
+
+
+  // Shuffle array function (Fisher-Yates algorithm)
+  const shuffleArray = (array) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
 
   async function loadGame() {
     const { data: room, error } = await supabase
       .from("rooms")
-      .select("questions")
+      .select("questions, game_start_time")
       .eq("code", roomCode)
       .single();
 
@@ -30,51 +55,98 @@ export default function MultiplayerGame() {
       return;
     }
 
-    // Randomize questions locally
-    const shuffled = [...room.questions].sort(() => Math.random() - 0.5);
-    setQuestions(shuffled);
-    setStartTime(Date.now());
+    // Shuffle questions for this player
+    const shuffledQuestions = shuffleArray(room.questions);
+    setQuestions(shuffledQuestions);
     setLoading(false);
-  }
-
-  async function handleAnswer(answer) {
-    if (selectedAnswer) return; // Prevent double clicks
-    setSelectedAnswer(answer);
-
-    const currentQuestion = questions[currentIndex];
-    const isCorrect = answer === currentQuestion.correctAnswer;
-
-    if (isCorrect) {
-      setScore(s => s + 1);
-    }
-
-    // Wait a bit before next question
-    setTimeout(async () => {
-      if (currentIndex + 1 < questions.length) {
-        setCurrentIndex(i => i + 1);
-        setSelectedAnswer(null);
+    
+    // Calculate remaining time based on global game start time
+    if (room.game_start_time) {
+      // game_start_time is stored as milliseconds timestamp
+      const gameStartTime = Number(room.game_start_time);
+      const gameEndTime = gameStartTime + 45000; // 45 seconds total
+      const now = Date.now();
+      const remainingMs = Math.max(0, gameEndTime - now);
+      const remainingSec = Math.ceil(remainingMs / 1000);
+      
+      console.log('Game Timer Debug:', {
+        game_start_time: room.game_start_time,
+        gameStartTime,
+        gameEndTime,
+        now,
+        diff: now - gameStartTime,
+        diffSeconds: (now - gameStartTime) / 1000,
+        remainingMs,
+        remainingSec
+      });
+      
+      setEndTime(gameEndTime);
+      setTimeLeft(remainingSec);
+      
+      if (remainingSec > 0) {
+        startTimer();
       } else {
-        await finishGame(score + (isCorrect ? 1 : 0));
+        // Game already ended - navigate directly to leaderboard
+        console.log('Game already ended, navigating to leaderboard');
+        navigate(`/leaderboard/${roomCode}`);
+        return;
       }
-    }, 1000);
+    } else {
+      // Fallback: no global start time (shouldn't happen)
+      console.warn('No game_start_time found, using local timer');
+      const calculatedEndTime = Date.now() + 45000;
+      setEndTime(calculatedEndTime);
+      setTimeLeft(45);
+      startTimer();
+    }
   }
 
-  async function finishGame(finalScore) {
-    const timeTaken = Date.now() - startTime;
+  const startTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+            if (prev <= 1) {
+                clearInterval(timerRef.current);
+                // Game over - navigate to leaderboard
+                navigate(`/leaderboard/${roomCode}`);
+                return 0;
+            }
+            return prev - 1;
+        });
+    }, 1000);
+  };
+
+  const handleAnswer = (questionId, answerLetter) => {
+    // Save answer
+    const newSelectedAnswers = {
+        ...selectedAnswers,
+        [questionId]: answerLetter
+    };
+    setSelectedAnswers(newSelectedAnswers);
+
+    // Auto advance
+    if (currentIndex + 1 < questions.length) {
+        setCurrentIndex(prev => prev + 1);
+    } else {
+        finishGame(newSelectedAnswers);
+    }
+  };
+
+  async function finishGame(finalAnswersMap = selectedAnswers) {
+    // Don't clear timer - let it continue
+    setPlayerFinished(true); // Mark player as finished
     
-    // Get player ID (we need to know who we are)
-    // Since we didn't store player ID in local state/context, we might need to find by name/room or store ID in localStorage
-    // For now, let's assume we can find the player by room_code and maybe we stored player ID in localStorage or session
-    // Or we can just update based on room_code and some other identifier. 
-    // Actually, JoinRoom didn't save player ID. Let's fix that assumption.
-    // Ideally we should have stored the player ID in localStorage when joining/creating.
-    
-    // Let's assume for this hackathon scope we can identify by something or just update the row that has status 'joined' and matching room_code? 
-    // No, that would update everyone.
-    
-    // FIX: We need to store player ID. 
-    // I will update JoinRoom and CreateRoom to store player ID in localStorage.
-    // For now, I'll write this code assuming I have the ID.
+    // Calculate score
+    let finalScore = 0;
+    questions.forEach(q => {
+        if (finalAnswersMap[q.id] === q.correct_answer) {
+            finalScore += 1;
+        }
+    });
+
+    // Calculate time taken based on global timer
+    const timeTaken = endTime ? Math.max(0, Math.ceil((endTime - Date.now()) / 1000)) : timeLeft;
+    const actualTimeTaken = 45 - timeTaken;
     
     const playerId = localStorage.getItem("quiz_player_id");
 
@@ -83,53 +155,81 @@ export default function MultiplayerGame() {
           .from("players")
           .update({ 
               score: finalScore, 
-              time_taken: timeTaken, 
+              time_taken: actualTimeTaken * 1000,
               status: "finished" 
           })
           .eq("id", playerId);
     }
-
-    navigate(`/leaderboard/${roomCode}`);
+    
+    // Clear localStorage for this game
+    localStorage.removeItem(`multiplayerGame_${roomCode}`);
+    
+    // DON'T navigate yet - let the timer run out or realtime subscription handle it
+    // Timer will continue and navigate when it hits 0
   }
 
-  if (loading) return <div className="text-white text-center mt-20">Loading game...</div>;
+  if (loading) return <div className="loading-container">Loading game...</div>;
+
+  // Show waiting screen if player finished AND actually answered questions
+  if (playerFinished && Object.keys(selectedAnswers).length > 0) {
+    return (
+      <div className="game-container" style={{ textAlign: 'center' }}>
+        <h2>All Questions Completed! ✓</h2>
+        <p style={{ fontSize: '1.2rem', margin: '2rem 0' }}>
+          Waiting for other players to finish...
+        </p>
+        <div className="timer" style={{ fontSize: '3rem', color: timeLeft < 10 ? 'red' : 'var(--accent-color)' }}>
+          {timeLeft}s
+        </div>
+        <p style={{ color: 'rgba(255, 255, 255, 0.6)', marginTop: '1rem' }}>
+          Game will end when time runs out or all players finish
+        </p>
+      </div>
+    );
+  }
 
   const question = questions[currentIndex];
-  const options = [...question.options].sort(() => Math.random() - 0.5); // Randomize options too if needed, or assume they come randomized
+  // Guard clause in case questions are empty or index out of bounds
+  if (!question) return <div className="error-container">Error: Question not found</div>;
+
+  const options = question.options; 
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6 flex flex-col items-center">
-      <div className="w-full max-w-2xl">
-        <div className="flex justify-between items-center mb-8">
-            <span className="text-xl font-bold text-blue-400">Question {currentIndex + 1}/{questions.length}</span>
-            <span className="text-xl font-mono text-yellow-400">Score: {score}</span>
-        </div>
-
-        <div className="bg-gray-800 p-8 rounded-xl shadow-2xl mb-8">
-            <h2 className="text-2xl font-semibold mb-6">{question.question}</h2>
-            
-            <div className="grid grid-cols-1 gap-4">
-                {options.map((opt, idx) => (
-                    <button
-                        key={idx}
-                        onClick={() => handleAnswer(opt)}
-                        disabled={selectedAnswer !== null}
-                        className={`p-4 rounded-lg text-left transition-all transform hover:scale-102 ${
-                            selectedAnswer === opt 
-                                ? opt === question.correctAnswer 
-                                    ? "bg-green-600 border-2 border-green-400" 
-                                    : "bg-red-600 border-2 border-red-400"
-                                : selectedAnswer !== null && opt === question.correctAnswer
-                                    ? "bg-green-600 border-2 border-green-400 opacity-70"
-                                    : "bg-gray-700 hover:bg-gray-600"
-                        }`}
-                    >
-                        {opt}
-                    </button>
-                ))}
+    <div className="game-container">
+        <div className="game-header">
+            <div className="timer" style={{ color: timeLeft < 10 ? 'red' : 'inherit' }}>
+                Time: {timeLeft}s
+            </div>
+            <div className="progress">
+                Question {currentIndex + 1} / {questions.length}
             </div>
         </div>
-      </div>
+
+        <div className="question-card">
+            <div className="category-badge">{question.category} - {question.difficulty}</div>
+            <h2 className="question-text">{question.question}</h2>
+            
+            <div className="options-grid">
+                {options.map((opt, idx) => {
+                    const letter = ['A', 'B', 'C', 'D'][idx];
+                    const isSelected = selectedAnswers[question.id] === letter;
+                    
+                    return (
+                        <button
+                            key={letter}
+                            onClick={() => handleAnswer(question.id, letter)}
+                            className={`option-btn ${isSelected ? 'selected' : ''}`}
+                        >
+                            <span className="option-letter">{letter}</span>
+                            <span className="option-text">{opt}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
     </div>
   );
 }
+
+
+

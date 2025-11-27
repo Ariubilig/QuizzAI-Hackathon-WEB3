@@ -137,12 +137,13 @@ export default function Lobby() {
         
         const quizData = await response.json();
         
-        // Update room with questions and status
+        // Update room with questions, status, and global start time (in milliseconds)
         await supabase
           .from("rooms")
           .update({ 
               status: "playing", 
-              questions: quizData.questions 
+              questions: quizData.questions,
+              game_start_time: Date.now().toString() // Store as string of milliseconds
           })
           .eq("code", roomCode);
           
@@ -177,42 +178,38 @@ export default function Lobby() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 p-8 bg-gray-900 min-h-screen text-white">
-      <h2 className="text-4xl font-bold mb-4">Lobby</h2>
-      <div className="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md text-center">
-        <p className="text-xl mb-2">Room Code:</p>
-        <p className="text-5xl font-mono font-bold text-yellow-400 tracking-widest mb-6">{roomCode}</p>
+    <div className="lobby-container">
+      <h2 className="lobby-title">Lobby</h2>
+      <div className="lobby-card">
+        <p className="lobby-code-label">Room Code:</p>
+        <p className="lobby-code-value">{roomCode}</p>
         
-        <div className="space-y-2 mb-8">
-            <h3 className="text-lg font-semibold text-gray-400 border-b border-gray-700 pb-2 mb-4">
-              Players ({players.length}/5) {isHost && <span className="text-yellow-400 text-sm">• You are Host</span>}
+        <div className="lobby-players-section">
+            <h3 className="lobby-players-header">
+              Players ({players.length}/5) {isHost && <span className="host-badge">• You are Host</span>}
             </h3>
             {players.map((p, idx) => (
-                <div key={p.id} className="flex items-center justify-center gap-2 animate-fade-in">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    <p className="text-lg">{p.name} {idx === 0 && <span className="text-yellow-400 text-sm">👑</span>}</p>
+                <div key={p.id} className="lobby-player-item">
+                    <div className="player-status-dot"></div>
+                    <p className="player-name">{p.name} {idx === 0 && <span className="host-badge">HOST</span>}</p>
                 </div>
             ))}
-            {players.length === 0 && <p className="text-gray-500 italic">Waiting for players...</p>}
+            {players.length === 0 && <p className="waiting-text">Waiting for players...</p>}
         </div>
 
-        <div className="flex gap-3">
+        <div className="lobby-actions">
             {isHost ? (
               <>
                 <button 
                     onClick={handleCancel}
-                    className="flex-1 py-3 bg-red-600 hover:bg-red-700 rounded-full font-bold text-lg transition-all transform hover:scale-105"
+                    className="btn-cancel-lobby"
                 >
                     Cancel
                 </button>
                 <button 
                     onClick={hostStart}
                     disabled={players.length === 0}
-                    className={`flex-1 py-3 rounded-full font-bold text-lg transition-all transform hover:scale-105 ${
-                        players.length > 0 
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30' 
-                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    }`}
+                    className="btn-start-game"
                 >
                     Start Game
                 </button>
@@ -220,7 +217,7 @@ export default function Lobby() {
             ) : (
               <button 
                   onClick={handleLeave}
-                  className="w-full py-3 bg-orange-600 hover:bg-orange-700 rounded-full font-bold text-lg transition-all transform hover:scale-105"
+                  className="btn-leave-lobby"
               >
                   Leave Room
               </button>

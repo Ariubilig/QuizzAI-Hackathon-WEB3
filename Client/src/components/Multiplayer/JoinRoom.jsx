@@ -1,90 +1,164 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "../../supabaseClient";
 import { useNavigate } from "react-router-dom";
 
 export default function JoinRoom() {
-  const [roomCode, setRoomCode] = useState("");
-  const [name, setName] = useState("");
+  const [code, setCode] = useState(["", "", "", ""]);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const inputs = useRef([]);
 
-  async function joinRoom() {
-    if (!roomCode || !name) {
-      alert("Please enter room code and name");
+  const processInput = (e, slot) => {
+    const char = e.target.value.toUpperCase();
+    if (char.length > 1) return; // Only allow single character
+    
+    const newCode = [...code];
+    newCode[slot] = char;
+    setCode(newCode);
+    
+    if (char && slot !== 3) {
+      inputs.current[slot + 1]?.focus();
+    }
+    
+    // Auto-submit when all 4 digits are filled
+    if (newCode.every(c => c !== "")) {
+      joinRoom(newCode.join(""));
+    }
+  };
+
+  const onKeyUp = (e, slot) => {
+    if (e.keyCode === 8 && !code[slot] && slot !== 0) {
+      const newCode = [...code];
+      newCode[slot - 1] = "";
+      setCode(newCode);
+      inputs.current[slot - 1]?.focus();
+    }
+  };
+
+  async function joinRoom(roomCode = code.join("")) {
+    // Get username from localStorage
+    const username = localStorage.getItem("quiz_username");
+    
+    if (!roomCode || roomCode.length !== 4) {
       return;
     }
 
+    if (!username) {
+      alert("Please set your username first");
+      navigate("/");
+      return;
+    }
+
+    setLoading(true);
     const upperCode = roomCode.toUpperCase();
 
-    // Check if room exists and is waiting
-    const { data: room, error: roomError } = await supabase
-      .from("rooms")
-      .select("*")
-      .eq("code", upperCode)
-      .single();
+    try {
+      // Check if room exists and is waiting
+      const { data: room, error: roomError } = await supabase
+        .from("rooms")
+        .select("*")
+        .eq("code", upperCode)
+        .single();
 
-    if (roomError || !room) {
-      alert("Room not found");
-      return;
-    }
+      if (roomError || !room) {
+        alert("Room not found");
+        setLoading(false);
+        setCode(["", "", "", ""]);
+        inputs.current[0]?.focus();
+        return;
+      }
 
-    if (room.status !== "waiting") {
-      alert("Game already started or finished");
-      return;
-    }
+      if (room.status !== "waiting") {
+        alert("Game already started or finished");
+        setLoading(false);
+        setCode(["", "", "", ""]);
+        inputs.current[0]?.focus();
+        return;
+      }
 
-    // Check player count
-    const { count, error: countError } = await supabase
-      .from("players")
-      .select("*", { count: "exact", head: true })
-      .eq("room_code", upperCode);
+      // Check player count
+      const { count } = await supabase
+        .from("players")
+        .select("*", { count: "exact", head: true })
+        .eq("room_code", upperCode);
 
-    if (count >= 5) {
-      alert("Room is full");
-      return;
-    }
+      if (count >= 5) {
+        alert("Room is full");
+        setLoading(false);
+        setCode(["", "", "", ""]);
+        inputs.current[0]?.focus();
+        return;
+      }
 
-    const { data: playerData, error: joinError } = await supabase
-      .from("players")
-      .insert({
-        room_code: upperCode,
-        name,
-        status: "joined"
-      })
-      .select()
-      .single();
+      const { data: playerData, error: joinError } = await supabase
+        .from("players")
+        .insert({
+          room_code: upperCode,
+          name: username,
+          status: "joined"
+        })
+        .select()
+        .single();
 
-    if (joinError) {
-      console.error("Error joining room:", joinError);
+      if (joinError) {
+        console.error("Error joining room:", joinError);
+        alert("Failed to join room");
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem("quiz_player_id", playerData.id);
+      navigate(`/lobby/${upperCode}`);
+    } catch (error) {
+      console.error("Error:", error);
       alert("Failed to join room");
-      return;
+      setLoading(false);
     }
-
-    localStorage.setItem("quiz_player_id", playerData.id);
-
-    // navigate to lobby page
-    navigate(`/lobby/${upperCode}`);
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 p-6 bg-gray-800 rounded-lg shadow-xl">
-      <h2 className="text-2xl font-bold text-white">Join a Room</h2>
-      <input 
-        placeholder="Room Code" 
-        value={roomCode}
-        onChange={e => setRoomCode(e.target.value)} 
-        className="px-4 py-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500"
-      />
-      <input 
-        placeholder="Your Name" 
-        value={name}
-        onChange={e => setName(e.target.value)} 
-        className="px-4 py-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500"
-      />
+    <div className="join-room-card">
+      <h2 className="join-room-title">Join a Room</h2>
+      
+      <div className="code-input">
+        <label className="code-label">Enter Room Code</label>
+        <div className="code-inputs">
+          {code.map((char, idx) => (
+            <input
+              key={idx}
+              type="text"
+              inputMode="text"
+              maxLength={1}
+              value={char}
+              autoFocus={idx === 0}
+              disabled={loading}
+              onChange={e => processInput(e, idx)}
+              onKeyUp={e => onKeyUp(e, idx)}
+              ref={ref => {
+                if (ref && !inputs.current.includes(ref)) {
+                  inputs.current[idx] = ref;
+                }
+              }}
+              className="code-input-box"
+            />
+          ))}
+        </div>
+      </div>
+
       <button 
-        onClick={joinRoom}
-        className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-full font-semibold transition-all transform hover:scale-105"
+        onClick={() => joinRoom()}
+        disabled={loading || code.some(c => !c)}
+        className="btn-join-action"
       >
-        Join Game
+        {loading ? "Joining..." : "Join Game"}
+      </button>
+      
+      <button 
+        onClick={() => navigate('/multiplayer')}
+        className="btn-back-menu"
+        style={{ marginTop: '1rem' }}
+      >
+        ← Back
       </button>
     </div>
   );

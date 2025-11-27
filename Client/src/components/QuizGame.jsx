@@ -4,7 +4,7 @@ import StartScreen from './StartScreen';
 import Profile from './Profile';
 
 const QuizGame = () => {
-    // Generate random username
+    // Generate random username as fallback
     const generateRandomUsername = () => {
         const randomNum = Math.floor(1000 + Math.random() * 9000);
         return `Player${randomNum}`;
@@ -22,9 +22,14 @@ const QuizGame = () => {
 
     const [endTime, setEndTime] = useState(null);
 
-    // Profile State
+    // Profile State - use stored username or generate random
+    const getInitialUsername = () => {
+        const storedUsername = localStorage.getItem('quiz_username');
+        return storedUsername || generateRandomUsername();
+    };
+
     const [userProfile, setUserProfile] = useState({
-        username: generateRandomUsername(),
+        username: getInitialUsername(),
         balance: 1000,
         history: [],
         stats: {
@@ -48,7 +53,13 @@ const QuizGame = () => {
         const savedProfile = localStorage.getItem('userProfile');
 
         if (savedProfile) {
-            setUserProfile(JSON.parse(savedProfile));
+            const profile = JSON.parse(savedProfile);
+            // Update username from localStorage if available
+            const currentUsername = localStorage.getItem('quiz_username');
+            if (currentUsername) {
+                profile.username = currentUsername;
+            }
+            setUserProfile(profile);
         }
 
         if (savedState) {
