@@ -238,11 +238,12 @@ const QuizGame = () => {
 
 
     // Wallet button component for top right
-    const WalletButton = () => (
+    const WalletButton = () => 
+        {haveamount && 
         <div className="wallet-button-container">
             <ConnectButton chainStatus="icon" showBalance={false} />
         </div>
-    );
+        };
 
     if (loading) {
         return (
