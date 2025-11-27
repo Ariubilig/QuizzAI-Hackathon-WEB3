@@ -7,7 +7,6 @@ import Lobby from './components/Multiplayer/Lobby';
 import MultiplayerGame from './components/Multiplayer/MultiplayerGame';
 import Leaderboard from './components/Multiplayer/Leaderboard';
 import UsernameModal from './components/UsernameModal';
-import './App.css';
 
 function App() {
   const [showUsernameModal, setShowUsernameModal] = useState(false);
