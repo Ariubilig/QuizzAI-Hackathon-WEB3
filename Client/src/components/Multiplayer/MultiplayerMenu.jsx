@@ -12,7 +12,7 @@ export default function MultiplayerMenu() {
   const [selectedCategory, setSelectedCategory] = useState('Mixed');
   const [selectedDifficulty, setSelectedDifficulty] = useState('Mixed');
 
-  const categories = ['Mixed', 'Science', 'History', 'Geography', 'Technology', 'Space', 'Pop Culture', 'Mathematics'];
+  const categories = ['Mixed', 'Өв Соёл', 'Спорт', 'Anime', 'eSports', 'Монголын Түүх', 'Поп Соёл', 'Монгол Хоол', 'Шинжлэх ухаан', 'Технологи', 'Математик', 'Ерөнхий мэдлэг'];
   const difficulties = ['Mixed', 'Easy', 'Medium', 'Hard'];
 
   async function handleCreateRoom() {

@@ -44,7 +44,7 @@ const QuizGame = () => {
     const [selectedDifficulty, setSelectedDifficulty] = useState('Mixed');
     const [view, setView] = useState('home'); // home, category, profile, playing, result
 
-    const categories = ['Mixed', 'Өв Соёл', 'Спорт', 'Anime', 'eSports', 'Монголын Түүх', 'Поп Соёл', 'Монголын Хоол', 'Шинжлэх ухаан', 'Технологи', 'Математик', 'Ерөнхий мэдлэг', 'ARD'];
+    const categories = ['Mixed', 'Өв Соёл', 'Спорт', 'Anime', 'eSports', 'Монголын Түүх', 'Поп Соёл', 'Монгол Хоол', 'Шинжлэх ухаан', 'Технологи', 'Математик', 'Ерөнхий мэдлэг'];
     const difficulties = ['Mixed', 'Easy', 'Medium', 'Hard'];
 
     // Load state from localStorage on mount

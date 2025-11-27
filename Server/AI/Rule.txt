@@ -33,12 +33,11 @@ AVAILABLE CATEGORIES (UPDATED):
 - eSports
 - Монголын Түүх
 - Поп Соёл
-- Монголын Хоол
+- Монгол Хоол
 - Шинжлэх ухаан
 - Технологи
 - Математик
 - Ерөнхий мэдлэг
-- ARD
 - Mixed  (only allowed when explicitly requested)
 
 CATEGORY RULES — CRITICAL:
