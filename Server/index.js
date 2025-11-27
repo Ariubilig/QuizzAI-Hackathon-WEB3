@@ -15,10 +15,40 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 app.post('/api/quiz', async (req, res) => {
     try {
+        const { category, difficulty } = req.body;
+        
+        // Special handling for ARD category - load from JSON file
+        if (category === 'ARD') {
+            console.log('Loading ARD quiz from ard.json');
+            const ardPath = path.join(__dirname, 'AI', 'ard.json');
+            const ardQuestions = JSON.parse(fs.readFileSync(ardPath, 'utf8'));
+            
+            // Shuffle and select 10 random questions
+            const shuffled = ardQuestions.sort(() => Math.random() - 0.5);
+            const selected = shuffled.slice(0, 10);
+            
+            // Convert to proper quiz format
+            const quizJson = {
+                quiz_id: `ard_quiz_${Date.now()}`,
+                questions: selected.map((q, index) => ({
+                    id: `q${index + 1}`,
+                    category: 'ARD',
+                    difficulty: difficulty && difficulty !== 'Mixed' ? difficulty.toLowerCase() : 'medium',
+                    question: q.question,
+                    options: q.options,
+                    correct_answer: ['A', 'B', 'C', 'D'][q.options.indexOf(q.answer)],
+                    explanation: `Зөв хариулт: ${q.answer}`
+                }))
+            };
+            
+            console.log(`ARD quiz generated with ${quizJson.questions.length} questions`);
+            res.json(quizJson);
+            return;
+        }
+        
+        // For other categories, use AI generation
         const rulePath = path.join(__dirname, 'AI', 'Rule.txt');
         const systemPrompt = fs.readFileSync(rulePath, 'utf8');
-
-        const { category, difficulty } = req.body;
         
         // Add random seed for uniqueness
         const randomSeed = Date.now() + Math.random();
