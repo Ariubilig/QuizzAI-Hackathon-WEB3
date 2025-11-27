@@ -251,6 +251,7 @@
 
 /* CreateRoom & JoinRoom Shared */
 .create-room-card, .join-room-card {
+  margin-top: 10rem;
   display: flex;
   flex-direction: column;
   align-items: center;
