@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../supabaseClient';
 import SelectCategory from './SelectCategory';
 import StartScreen from './StartScreen';
 import Profile from './Profile';
@@ -150,20 +151,16 @@ const QuizGame = () => {
         localStorage.removeItem('quizState');
 
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/quiz`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+            const { data, error } = await supabase.functions.invoke('generate-quiz', {
+                body: {
                     category: selectedCategory,
                     difficulty: selectedDifficulty
-                }),
+                }
             });
-            if (!response.ok) {
-                throw new Error('Failed to fetch quiz');
+
+            if (error) {
+                throw new Error(error.message || 'Failed to fetch quiz');
             }
-            const data = await response.json();
 
             if (!data || !data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
                 throw new Error('Invalid quiz data received from server');

@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "serve": "deno run --allow-net --allow-read --allow-env index.ts"
+  },
+  "imports": {
+    "groq-sdk": "npm:groq-sdk@0.36.0"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window"]
+  }
+}

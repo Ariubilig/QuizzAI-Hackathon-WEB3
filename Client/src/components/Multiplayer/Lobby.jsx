@@ -143,20 +143,17 @@ export default function Lobby() {
   async function hostStart() {
     if (!room) return;
 
-    // Fetch questions from Server API
+    // Fetch questions from Supabase Edge Function
     try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/quiz`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+        const { data: quizData, error } = await supabase.functions.invoke('generate-quiz', {
+            body: { 
                 category: room.category, 
                 difficulty: room.difficulty 
-            })
+            }
         });
         
-        if (!response.ok) throw new Error("Failed to fetch questions");
-        
-        const quizData = await response.json();
+        if (error) throw new Error(error.message || "Failed to fetch questions");
+        if (!quizData || !quizData.questions) throw new Error("Invalid quiz data");
         
         // Update room with questions, status, and global start time (in milliseconds)
         await supabase
