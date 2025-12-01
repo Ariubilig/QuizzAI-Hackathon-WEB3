@@ -29,6 +29,12 @@ export default function MultiplayerGame() {
     };
   }, [roomCode]);
 
+  useEffect(() => {
+    if (timeLeft === 0) {
+        navigate(`/leaderboard/${roomCode}`);
+    }
+  }, [timeLeft, roomCode, navigate]);
+
   // Don't save multiplayer game state to localStorage
   // We always load fresh from database
 
@@ -108,7 +114,7 @@ export default function MultiplayerGame() {
             if (prev <= 1) {
                 clearInterval(timerRef.current);
                 // Game over - navigate to leaderboard
-                navigate(`/leaderboard/${roomCode}`);
+                // navigate(`/leaderboard/${roomCode}`); // Moved to useEffect
                 return 0;
             }
             return prev - 1;

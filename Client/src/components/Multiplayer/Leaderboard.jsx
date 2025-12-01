@@ -214,7 +214,7 @@ export default function Leaderboard() {
         {top3[1] && (
           <div className="podium-item rank-2">
             <div className="podium-player-info">
-              <div className="podium-avatar">{top3[1].name.charAt(0).toUpperCase()}</div>
+              <div className="podium-avatar">{top3[1].name?.charAt(0).toUpperCase()}</div>
               <div className="podium-name">{top3[1].name}</div>
               <div className="podium-score">{top3[1].score} pts</div>
             </div>
@@ -242,7 +242,7 @@ export default function Leaderboard() {
         {top3[2] && (
           <div className="podium-item rank-3">
             <div className="podium-player-info">
-              <div className="podium-avatar">{top3[2].name.charAt(0).toUpperCase()}</div>
+              <div className="podium-avatar">{top3[2].name?.charAt(0).toUpperCase()}</div>
               <div className="podium-name">{top3[2].name}</div>
               <div className="podium-score">{top3[2].score} pts</div>
             </div>
